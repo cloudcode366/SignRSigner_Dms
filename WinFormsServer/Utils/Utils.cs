@@ -20,9 +20,10 @@ namespace WinFormsServer.Utils
     {
         //id-llx,lly,urx,ury
         const string fileNew = @"C:\OnlineSign\Signed\signed-{0}";
+        const string SW_TEST_CER_PATH = @"/home/wiramin/ssl-test/certificate.pfx";
         public static X509Certificate2 GetCertificate()
         {
-            X509Store userCaStore = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+            X509Store userCaStore = new X509Store(SW_TEST_CER_PATH);
             try
             {
                 userCaStore.Open(OpenFlags.ReadOnly);
@@ -101,7 +102,7 @@ namespace WinFormsServer.Utils
             return new ByteArrayContent(ReadFully(fileName));
         }*/
 
-        public static UploadFileResource SignWithThisCert(X509Certificate2 cert, string fileInputPath, SignInfoResource resource, int? page)
+        public static UploadFileResource SignWithThisCert(X509Certificate2 cert, string fileInputPath, SignInfoResource resource, int? page,string imageInputPath)
         {
             string SourcePdfFileName = fileInputPath;
             var fileName = Path.GetFileName(SourcePdfFileName);
@@ -111,20 +112,40 @@ namespace WinFormsServer.Utils
             IExternalSignature externalSignature = new X509Certificate2Signature(cert, "SHA-1");
             PdfReader pdfReader = new PdfReader(SourcePdfFileName);
             //PdfReader pdfReader = new PdfReader(streamFile);
+            if (!File.Exists(imageInputPath))
+            {
+                throw new FileNotFoundException("Không tìm thấy ảnh chữ ký tại: " + imageInputPath);
+            }
+            iTextSharp.text.Image signatureImage = iTextSharp.text.Image.GetInstance(imageInputPath);
             FileStream signedPdf = new FileStream(DestPdfFileName, FileMode.Create);  //the output pdf file
             PdfStamper pdfStamper = PdfStamper.CreateSignature(pdfReader, signedPdf, '\0');
             PdfSignatureAppearance signatureAppearance = pdfStamper.SignatureAppearance;
             //signatureAppearance.SetVisibleSignature("Signature2");
-            signatureAppearance.SignatureRenderingMode = PdfSignatureAppearance.RenderingMode.DESCRIPTION;
+            signatureAppearance.SignatureRenderingMode = PdfSignatureAppearance.RenderingMode.GRAPHIC;
             //signatureAppearance.Layer2Text = "Được ký bởi" + cert.GetName().ToString();
+            signatureAppearance.Image = signatureImage;
 
-            signatureAppearance.SetVisibleSignature(new iTextSharp.text.Rectangle(resource.llx, resource.lly, resource.urx, resource.ury), page ?? pdfReader.NumberOfPages, null);
+            // Tùy chỉnh kích thước ảnh (nếu cần)
+            signatureAppearance.ImageScale = 0; // 0: giữ nguyên tỷ lệ ảnh, hoặc đặt giá trị cụ thể để co giãn
+
+            // Đặt vị trí chữ ký trên PDF (dựa trên tọa độ từ resource)
+            signatureAppearance.SetVisibleSignature(
+                new iTextSharp.text.Rectangle(resource.llx, resource.lly, resource.urx, resource.ury),
+                page ?? pdfReader.NumberOfPages,
+                null
+            );
+            // signatureAppearance.SetVisibleSignature(new iTextSharp.text.Rectangle(resource.llx, resource.lly, resource.urx, resource.ury), page ?? pdfReader.NumberOfPages, null);
             //signatureAppearance.SetVisibleSignature(new iTextSharp.text.Rectangle(425, 100, 575, 155), page ?? pdfReader.NumberOfPages, resource.searchText);
-            BaseFont unicode =
-                        BaseFont.CreateFont("c:/windows/fonts/times.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-            signatureAppearance.Layer2Font = new iTextSharp.text.Font(unicode);
+            // BaseFont unicode =
+            //             BaseFont.CreateFont("c:/windows/fonts/times.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+            // BaseFont unicode =
+            //     BaseFont.CreateFont("Times New Roman", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+            // signatureAppearance.Layer2Font = new iTextSharp.text.Font(unicode);
+            // MakeSignature.SignDetached(signatureAppearance, externalSignature, chain, null, null, null, 0, CryptoStandard.CMS);
             MakeSignature.SignDetached(signatureAppearance, externalSignature, chain, null, null, null, 0, CryptoStandard.CMS);
-
+            pdfStamper.Close();
+            pdfReader.Close();
+            signedPdf.Close();
             return new UploadFileResource
             {
                 fileName = fileName,

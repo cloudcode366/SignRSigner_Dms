@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sign Info Input</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+</head>
+<body>
+<h1>Sign Info Input</h1>
+
+<label>llx (Lower Left X):</label><br>
+<input type="number" id="llx" value="0"><br><br>
+
+<label>lly (Lower Left Y):</label><br>
+<input type="number" id="lly" value="0"><br><br>
+
+<label>urx (Upper Right X):</label><br>
+<input type="number" id="urx" value="0"><br><br>
+
+<label>ury (Upper Right Y):</label><br>
+<input type="number" id="ury" value="0"><br><br>
+
+<label>Page:</label><br>
+<input type="number" id="page" value="1"><br><br>
+
+<label>Token:</label><br>
+<input type="text" id="token" value=""><br><br>
+
+<label>Document ID:</label><br>
+<input type="text" id="documentId" value=""><br><br>
+
+<button onclick="sendSignInfo()">Send to Service</button>
+
+<script>
+    // Khởi tạo kết nối SignalR
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("http://localhost:8080/signalr/hub") // Thay bằng URL của SignalR Hub
+        .build();
+
+    // Bắt đầu kết nối
+    connection.start().catch(err => console.error(err.toString()));
+
+    // Hàm gửi dữ liệu
+    function sendSignInfo() {
+        const signInfo = {
+            llx: parseInt(document.getElementById('llx').value),
+            lly: parseInt(document.getElementById('lly').value),
+            urx: parseInt(document.getElementById('urx').value),
+            ury: parseInt(document.getElementById('ury').value),
+            page: parseInt(document.getElementById('page').value),
+            token: document.getElementById('token').value,
+            documentId: document.getElementById('documentId').value
+        };
+
+        // Gửi dữ liệu đến SignalR Hub
+        connection.invoke("SendSignInfo", signInfo)
+            .then(() => console.log("Data sent successfully"))
+            .catch(err => console.error("Error sending data: ", err));
+    }
+</script>
+</body>
+</html>

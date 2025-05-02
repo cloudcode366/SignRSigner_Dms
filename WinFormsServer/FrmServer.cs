@@ -137,9 +137,16 @@ namespace WinFormsServer
                 {
                     writeToLog($"{clientName}: Error - {ex.Message}");
                     var responseClient = new ResponseModel();
-                    responseClient.isSuccess = false;
-                    responseClient.code = 0;
-                    responseClient.responseFailed = "Chuỗi ký tự không đúng, vui lòng kiểm tra lại!";
+                    responseClient.Message = message;
+                    responseClient.StatusCode = (int) HttpStatusCode.InternalServerError;
+                    responseClient.Content = new ContentModel()
+                    {
+                        File = "",
+                        Image = ""
+                    };
+                    responseClient.Size = 1;
+                    responseClient.MeatadataDto = new MeatadataDto();
+                    // responseClient.responseFailed = "Chuỗi ký tự không đúng, vui lòng kiểm tra lại!";
                     ResponseAction(JsonConvert.SerializeObject(responseClient));
                 }
             }));
@@ -243,14 +250,15 @@ namespace WinFormsServer
             String xml = ConfigurationManager.AppSettings["XML"].ToString();
             string folder = @"C:\OnlineSign\Signed\";
             var responseClient = new ResponseModel();
-            responseClient.isSuccess = false;
-            responseClient.code = 0;
+            // responseClient.isSuccess = false;
+            responseClient.StatusCode = (int)HttpStatusCode.InternalServerError;
             
             try
             {
                 //llx,lly,urx,ury-type-file
                 //string loc = "";
                 string filePath = "";
+                string imagePath = "";
 
                 Directory.CreateDirectory(folder);
 
@@ -258,7 +266,7 @@ namespace WinFormsServer
                                                          //var cert = new X509Certificate2(@"F:\HDDT\MyCert.pfx");
                 if (cert == null)
                 {
-                    responseClient.responseFailed = "Không nhận diện được chữ kí số, vui lòng kiểm tra lại!";
+                    responseClient.Message = "Không nhận diện được chữ kí số, vui lòng kiểm tra lại!";
                     ResponseAction(JsonConvert.SerializeObject(responseClient));
                     writeToLog("Không nhận diện được chữ kí số, vui lòng kiểm tra lại");
                     //throw new Exception("Không nhận diện được chữ kí số, vui lòng kiểm tra lại");
@@ -281,26 +289,26 @@ namespace WinFormsServer
                         {
                             ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                             client.BaseAddress = new Uri(_uri);
-                            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", resource.Token);
-                            result = await client.GetAsync($"api/document/{resource.FileID}/content");
+                            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", resource.token);
+                            result = await client.GetAsync($"api/Document/view-document-for-usb");
                             var responseBody = new ResponseModel();
                             
                             if (result.IsSuccessStatusCode)
                             {
                                 responseBody = JsonConvert.DeserializeObject<ResponseModel>(await result.Content.ReadAsStringAsync());
-                                if (responseBody.isSuccess)
+                                if (responseBody.StatusCode == 200)
                                 {
                                     try
                                     {
-                                        filePath = ConvertBase64ToPDF(responseBody.responseSuccess, folder);
-
+                                        filePath = ConvertBase64ToPDF(responseBody.Content.File, folder);
+                                        imagePath = ConvertBase64ToPDF(responseBody.Content.Image, folder);
                                         result = null;
                                         var uploadFile = new UploadFileResource();
                                         //var responseFile = new FileDownloadResponse();
-                                        switch (resource.FileType.Trim().ToUpper())
+                                        switch ("pdf".Trim().ToUpper())
                                         {
                                             case var value when value == pdf:
-                                                uploadFile = Utils.Utils.SignWithThisCert(cert, filePath, resource, null);
+                                                uploadFile = Utils.Utils.SignWithThisCert(cert, filePath, resource, resource.page,imagePath);
                                                 content.Add(new StreamContent(uploadFile.File), "File", uploadFile.fileName);
                                                 break;
                                             case var value when value == xml:
@@ -310,27 +318,28 @@ namespace WinFormsServer
                                             //   Utils.Utils.SignWithThisCert(cert, filePath, int.Parse(locs[0]), int.Parse(locs[1]), int.Parse(locs[2]), int.Parse(locs[3]), page);
                                             //    break;
                                             default:
-                                                responseClient.responseFailed = "Chưa hổ trợ loại file này!";
+                                                responseClient.Message = "Chưa hổ trợ loại file này!";
                                                 ResponseAction(JsonConvert.SerializeObject(responseClient));
                                                 writeToLog("Chưa hổ trợ loại file này");
                                                 break;
                                         }
-                                        result = await client.PostAsync($"api/sign/document/upload-version?id={resource.FileID}", content);
+                                        result = await client.PostAsync($"api/Document/update-document-from-usb/{resource.documentId}", content);
                                         responseBody = JsonConvert.DeserializeObject<ResponseModel>(await result.Content.ReadAsStringAsync());
                                         if (result.IsSuccessStatusCode)
                                         {
-                                            responseClient.isSuccess = true;
-                                            responseClient.responseSuccess = "Ký thành công!";
+                                            // responseClient.isSuccess = true;
+                                            responseClient.StatusCode = 200;
+                                            responseClient.Message = "Ký thành công!";
                                             ResponseAction(JsonConvert.SerializeObject(responseClient));
                                             writeToLog("Ký thành công");
                                         }
                                         else
                                         {
                                             //responseBody = JsonConvert.DeserializeObject<FileDownloadResponse>(await result.Content.ReadAsStringAsync());
-                                            responseClient.isSuccess = false;
-                                            responseClient.responseFailed = "Tải lên hệ thống thất bại!";
+                                            responseClient.StatusCode = 500;
+                                            responseClient.Message = "Tải lên hệ thống thất bại!";
                                             ResponseAction(JsonConvert.SerializeObject(responseClient));
-                                            writeToLog("Tải lên hệ thống thất bại: " + responseBody.responseFailed);
+                                            writeToLog("Tải lên hệ thống thất bại: " + responseBody.Message);
                                         }
 
                                         #region Delete file after sent success
@@ -346,21 +355,21 @@ namespace WinFormsServer
                                     }
                                     catch (Exception ex)
                                     {
-                                        responseClient.responseFailed = "Giải nén file thất bại!";
+                                        responseClient.Message = "Giải nén file thất bại!";
                                         ResponseAction(JsonConvert.SerializeObject(responseClient));
                                         writeToLog($"Giải nén file thất bại: {ex.Message}");
                                     }
                                 }
                                 else
                                 {
-                                    responseClient.responseFailed = "Download file thất bại!";
+                                    responseClient.Message = "Download file thất bại!";
                                     ResponseAction(JsonConvert.SerializeObject(responseClient));
-                                    writeToLog($"Download file thất bại: {responseBody.responseFailed}");
+                                    writeToLog($"Download file thất bại: {responseBody.Message}");
                                 }
                             }
                             else
                             {
-                                responseClient.responseFailed = "Kết nối server thất bại!";
+                                responseClient.Message = "Kết nối server thất bại!";
                                 ResponseAction(JsonConvert.SerializeObject(responseClient));
                                 writeToLog("Kết nối server thất bại");
                             }
@@ -371,7 +380,7 @@ namespace WinFormsServer
                     }
                     else
                     {
-                        responseClient.responseFailed = $"Bạn đang dùng sai chữ ký! MST: {mst}!";
+                        responseClient.Message = $"Bạn đang dùng sai chữ ký! MST: {mst}!";
                         ResponseAction(JsonConvert.SerializeObject(responseClient));
                         writeToLog($"Bạn đang dùng sai chữ ký! MST: {mst}");
                         //MessageBox.Show($"Bạn đang dùng sai chữ ký! MST: {mst}");
@@ -384,7 +393,7 @@ namespace WinFormsServer
             }
             catch (Exception ex)
             {
-                responseClient.responseFailed = $"Lỗi phần mềm!";
+                responseClient.Message = $"Lỗi phần mềm!";
                 ResponseAction(JsonConvert.SerializeObject(responseClient));
                 writeToLog(ex.Message);
                 //MessageBox.Show(ex.Message);
@@ -396,6 +405,13 @@ namespace WinFormsServer
         {
             string fileName = DateTime.Now.ToString("ddMMyyyyHHmmss");
             string path = folder + fileName + ".pdf";
+            File.WriteAllBytes(path, Convert.FromBase64String(reource));
+            return path;
+        }
+        private string ConvertBase64ToPng(string reource, string folder)
+        {
+            string fileName = DateTime.Now.ToString("ddMMyyyyHHmmss");
+            string path = folder + fileName + ".png";
             File.WriteAllBytes(path, Convert.FromBase64String(reource));
             return path;
         }

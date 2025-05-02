@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using Microsoft.AspNet.SignalR;
+using SgTest3.Model;
 
 namespace WinFormsServer
 {
@@ -24,6 +25,7 @@ namespace WinFormsServer
 
         public static event MessageReceivedEventHandler MessageReceived;
 
+
         public static void ClearState()
         {
             _users.Clear();
@@ -38,7 +40,11 @@ namespace WinFormsServer
 
             return base.OnConnected();
         }
-
+        public void SendSignInfo(SignInfoResource signInfo)
+        {
+            // Xử lý dữ liệu
+            Clients.Caller.ReceiveSignInfoResponse($"Received sign info: llx={signInfo.llx}, documentId={signInfo.documentId}");
+        }
         //Called when a client is disconnected
         public override Task OnDisconnected(bool stopCalled)
         {

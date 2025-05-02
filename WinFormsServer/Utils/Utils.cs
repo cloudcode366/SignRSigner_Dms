@@ -23,7 +23,9 @@ namespace WinFormsServer.Utils
         const string SW_TEST_CER_PATH = @"/home/wiramin/ssl-test/certificate.pfx";
         public static X509Certificate2 GetCertificate()
         {
-            X509Store userCaStore = new X509Store(SW_TEST_CER_PATH);
+            // X509Store userCaStore = new X509Store(SW_TEST_CER_PATH);
+            X509Store userCaStore = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+
             try
             {
                 userCaStore.Open(OpenFlags.ReadOnly);

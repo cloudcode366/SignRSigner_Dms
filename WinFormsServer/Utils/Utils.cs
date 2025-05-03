@@ -21,6 +21,7 @@ namespace WinFormsServer.Utils
         //id-llx,lly,urx,ury
         const string fileNew = @"C:\OnlineSign\Signed\signed-{0}";
         const string SW_TEST_CER_PATH = @"/home/wiramin/ssl-test/certificate.pfx";
+
         public static X509Certificate2 GetCertificate()
         {
             // X509Store userCaStore = new X509Store(SW_TEST_CER_PATH);
@@ -35,7 +36,7 @@ namespace WinFormsServer.Utils
                 X509Certificate2 clientCertificate = null;
                 if (findResult.Count > 0)
                 {
-                    foreach(var i in findResult)
+                    foreach (var i in findResult)
                     {
                         if (i.Subject.Contains("C=VN"))
                         {
@@ -49,6 +50,7 @@ namespace WinFormsServer.Utils
                 {
                     throw new Exception("Không nhận diện được chữ kí số, vui lòng kiểm tra lại");
                 }
+
                 return clientCertificate;
             }
             catch
@@ -104,54 +106,120 @@ namespace WinFormsServer.Utils
             return new ByteArrayContent(ReadFully(fileName));
         }*/
 
-        public static UploadFileResource SignWithThisCert(X509Certificate2 cert, string fileInputPath, SignInfoResource resource, int? page,string imageInputPath)
+        // public static UploadFileResource SignWithThisCert(X509Certificate2 cert, string fileInputPath, SignInfoResource resource, int? page,string imageInputPath)
+        // {
+        //     string SourcePdfFileName = fileInputPath;
+        //     var fileName = Path.GetFileName(SourcePdfFileName);
+        //     string DestPdfFileName = String.Format(fileNew, fileName);
+        //     Org.BouncyCastle.X509.X509CertificateParser cp = new Org.BouncyCastle.X509.X509CertificateParser();
+        //     Org.BouncyCastle.X509.X509Certificate[] chain = new Org.BouncyCastle.X509.X509Certificate[] { cp.ReadCertificate(cert.RawData) };
+        //     IExternalSignature externalSignature = new X509Certificate2Signature(cert, "SHA-1");
+        //     PdfReader pdfReader = new PdfReader(SourcePdfFileName);
+        //     //PdfReader pdfReader = new PdfReader(streamFile);
+        //     if (!File.Exists(imageInputPath))
+        //     {
+        //         throw new FileNotFoundException("Không tìm thấy ảnh chữ ký tại: " + imageInputPath);
+        //     }
+        //     iTextSharp.text.Image signatureImage = iTextSharp.text.Image.GetInstance(imageInputPath);
+        //     FileStream signedPdf = new FileStream(DestPdfFileName, FileMode.Create);  //the output pdf file
+        //     PdfStamper pdfStamper = PdfStamper.CreateSignature(pdfReader, signedPdf, '\0');
+        //     PdfSignatureAppearance signatureAppearance = pdfStamper.SignatureAppearance;
+        //     //signatureAppearance.SetVisibleSignature("Signature2");
+        //     signatureAppearance.SignatureRenderingMode = PdfSignatureAppearance.RenderingMode.GRAPHIC;
+        //     //signatureAppearance.Layer2Text = "Được ký bởi" + cert.GetName().ToString();
+        //     signatureAppearance.Image = signatureImage;
+        //
+        //     // Tùy chỉnh kích thước ảnh (nếu cần)
+        //     signatureAppearance.ImageScale = 0; // 0: giữ nguyên tỷ lệ ảnh, hoặc đặt giá trị cụ thể để co giãn
+        //
+        //     // Đặt vị trí chữ ký trên PDF (dựa trên tọa độ từ resource)
+        //     signatureAppearance.SetVisibleSignature(
+        //         new iTextSharp.text.Rectangle(resource.llx, resource.lly, resource.urx, resource.ury),
+        //         page ?? pdfReader.NumberOfPages,
+        //         null
+        //     );
+        //     // signatureAppearance.SetVisibleSignature(new iTextSharp.text.Rectangle(resource.llx, resource.lly, resource.urx, resource.ury), page ?? pdfReader.NumberOfPages, null);
+        //     //signatureAppearance.SetVisibleSignature(new iTextSharp.text.Rectangle(425, 100, 575, 155), page ?? pdfReader.NumberOfPages, resource.searchText);
+        //     // BaseFont unicode =
+        //     //             BaseFont.CreateFont("c:/windows/fonts/times.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+        //     // BaseFont unicode =
+        //     //     BaseFont.CreateFont("Times New Roman", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+        //     // signatureAppearance.Layer2Font = new iTextSharp.text.Font(unicode);
+        //     // MakeSignature.SignDetached(signatureAppearance, externalSignature, chain, null, null, null, 0, CryptoStandard.CMS);
+        //     MakeSignature.SignDetached(signatureAppearance, externalSignature, chain, null, null, null, 0, CryptoStandard.CMS);
+        //     pdfStamper.Close();
+        //     pdfReader.Close();
+        //     signedPdf.Close();
+        //     return new UploadFileResource
+        //     {
+        //         fileName = fileName,
+        //         File = ReadFully(fileName)
+        //     };
+        // }
+
+        public static UploadFileResource SignWithThisCert(X509Certificate2 cert, string fileInputPath,
+            SignInfoResource resource, int? page, string imageInputPath)
         {
             string SourcePdfFileName = fileInputPath;
             var fileName = Path.GetFileName(SourcePdfFileName);
-            string DestPdfFileName = String.Format(fileNew, fileName);
+            string DestPdfFileName = String.Format(fileNew, fileName); // fileNew cần được định nghĩa trước
+
             Org.BouncyCastle.X509.X509CertificateParser cp = new Org.BouncyCastle.X509.X509CertificateParser();
-            Org.BouncyCastle.X509.X509Certificate[] chain = new Org.BouncyCastle.X509.X509Certificate[] { cp.ReadCertificate(cert.RawData) };
+            Org.BouncyCastle.X509.X509Certificate[] chain = new Org.BouncyCastle.X509.X509Certificate[]
+                { cp.ReadCertificate(cert.RawData) };
             IExternalSignature externalSignature = new X509Certificate2Signature(cert, "SHA-1");
+
             PdfReader pdfReader = new PdfReader(SourcePdfFileName);
-            //PdfReader pdfReader = new PdfReader(streamFile);
-            if (!File.Exists(imageInputPath))
-            {
-                throw new FileNotFoundException("Không tìm thấy ảnh chữ ký tại: " + imageInputPath);
-            }
-            iTextSharp.text.Image signatureImage = iTextSharp.text.Image.GetInstance(imageInputPath);
-            FileStream signedPdf = new FileStream(DestPdfFileName, FileMode.Create);  //the output pdf file
-            PdfStamper pdfStamper = PdfStamper.CreateSignature(pdfReader, signedPdf, '\0');
+            FileStream signedPdf = new FileStream(DestPdfFileName, FileMode.Create);
+            PdfStamper pdfStamper = PdfStamper.CreateSignature(pdfReader, signedPdf, '\0',null,true);
             PdfSignatureAppearance signatureAppearance = pdfStamper.SignatureAppearance;
-            //signatureAppearance.SetVisibleSignature("Signature2");
+
+            iTextSharp.text.Image signatureImage = null;
+            try
+            {
+                if (string.IsNullOrEmpty(imageInputPath) || !File.Exists(imageInputPath))
+                {
+                    throw new FileNotFoundException("Không tìm thấy ảnh chữ ký tại: " + imageInputPath);
+                }
+
+                signatureImage = iTextSharp.text.Image.GetInstance(imageInputPath);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Lỗi khi tải ảnh chữ ký: " + ex.Message, ex);
+            }
+
             signatureAppearance.SignatureRenderingMode = PdfSignatureAppearance.RenderingMode.GRAPHIC;
-            //signatureAppearance.Layer2Text = "Được ký bởi" + cert.GetName().ToString();
-            signatureAppearance.Image = signatureImage;
+            signatureAppearance.SignatureGraphic = signatureImage;
 
-            // Tùy chỉnh kích thước ảnh (nếu cần)
-            signatureAppearance.ImageScale = 0; // 0: giữ nguyên tỷ lệ ảnh, hoặc đặt giá trị cụ thể để co giãn
+            // Điều chỉnh kích thước ảnh theo vùng chữ ký
+            float rectWidth = resource.urx - resource.llx;
+            float rectHeight = resource.ury - resource.lly;
+            signatureImage.ScaleToFit(rectWidth, rectHeight);
 
-            // Đặt vị trí chữ ký trên PDF (dựa trên tọa độ từ resource)
+            // Đặt vị trí chữ ký
             signatureAppearance.SetVisibleSignature(
                 new iTextSharp.text.Rectangle(resource.llx, resource.lly, resource.urx, resource.ury),
                 page ?? pdfReader.NumberOfPages,
                 null
             );
-            // signatureAppearance.SetVisibleSignature(new iTextSharp.text.Rectangle(resource.llx, resource.lly, resource.urx, resource.ury), page ?? pdfReader.NumberOfPages, null);
-            //signatureAppearance.SetVisibleSignature(new iTextSharp.text.Rectangle(425, 100, 575, 155), page ?? pdfReader.NumberOfPages, resource.searchText);
-            // BaseFont unicode =
-            //             BaseFont.CreateFont("c:/windows/fonts/times.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-            // BaseFont unicode =
-            //     BaseFont.CreateFont("Times New Roman", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-            // signatureAppearance.Layer2Font = new iTextSharp.text.Font(unicode);
-            // MakeSignature.SignDetached(signatureAppearance, externalSignature, chain, null, null, null, 0, CryptoStandard.CMS);
-            MakeSignature.SignDetached(signatureAppearance, externalSignature, chain, null, null, null, 0, CryptoStandard.CMS);
-            pdfStamper.Close();
-            pdfReader.Close();
-            signedPdf.Close();
+
+            try
+            {
+                MakeSignature.SignDetached(signatureAppearance, externalSignature, chain, null, null, null, 0,
+                    CryptoStandard.CMS);
+            }
+            finally
+            {
+                // pdfStamper.Close();
+                pdfReader.Close();
+                signedPdf.Close();
+            }
+
             return new UploadFileResource
             {
                 fileName = fileName,
-                File = ReadFully(fileName)
+                File = ReadFully(DestPdfFileName) // Sử dụng DestPdfFileName thay vì fileName
             };
         }
 
@@ -185,7 +253,8 @@ namespace WinFormsServer.Utils
 
             //sign date
             //TIMESTAMP
-            XmlElement signaturePropertiesRoot = doc.CreateElement("SignatureProperties", "http://www.w3.org/2000/09/xmldsig#");
+            XmlElement signaturePropertiesRoot =
+                doc.CreateElement("SignatureProperties", "http://www.w3.org/2000/09/xmldsig#");
             DataObject signatureProperties = new DataObject();
             signatureProperties.Id = "idTimeStamp";
             signatureProperties.Data = signaturePropertiesRoot.SelectNodes(".");
@@ -280,7 +349,7 @@ namespace WinFormsServer.Utils
             }
         }*/
 
-        public static FileStream ReadFully(String fileName)
+        public static byte[] ReadFully(String fileName)
         {
             /*byte[] bytes;
             using (FileStream fileStream = File.Open(String.Format(fileNew, fileName), FileMode.Open, FileAccess.Read))
@@ -288,7 +357,7 @@ namespace WinFormsServer.Utils
                 bytes = new byte[fileStream.Length];
                 fileStream.Read(bytes, 0, (int)fileStream.Length);
             }*/
-            FileStream fileStream = File.Open(String.Format(fileNew, fileName), FileMode.Open, FileAccess.Read);
+            var fileStream = File.ReadAllBytes(fileName);
             return fileStream;
         }
 
@@ -331,7 +400,8 @@ namespace WinFormsServer.Utils
 
                 // request headers
                 client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/x-www-form-urlencoded"));
+                client.DefaultRequestHeaders.Accept.Add(
+                    new MediaTypeWithQualityHeaderValue("application/x-www-form-urlencoded"));
 
                 // request body
                 var content = new FormUrlEncodedContent(new[]
@@ -416,7 +486,6 @@ namespace WinFormsServer.Utils
             {
                 return null;
             }
-
         }
 
         // Đọc và ghi file PDF từ server
@@ -467,7 +536,8 @@ namespace WinFormsServer.Utils
             if (idElem == null)
             {
                 XmlNamespaceManager nsManager = new XmlNamespaceManager(doc.NameTable);
-                nsManager.AddNamespace("wsu", "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd");
+                nsManager.AddNamespace("wsu",
+                    "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd");
 
                 idElem = doc.SelectSingleNode("//*[@wsu:Id=\"" + id + "\"]", nsManager) as XmlElement;
             }

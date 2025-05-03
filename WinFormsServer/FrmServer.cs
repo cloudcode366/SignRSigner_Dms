@@ -23,6 +23,10 @@ using SgTest3.Properties;
 using iTextSharp.text.pdf;
 using System.Runtime.InteropServices;
 using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using Newtonsoft.Json.Linq;
+
 //using static System.Net.WebRequestMethods;
 
 namespace WinFormsServer
@@ -46,6 +50,10 @@ namespace WinFormsServer
             SimpleHub.ClientJoinedToGroup += SimpleHub_ClientJoinedToGroup;
             SimpleHub.ClientLeftGroup += SimpleHub_ClientLeftGroup;
             SimpleHub.MessageReceived += SimpleHub_MessageReceived;
+            // InitializeComponent();
+            // this.Load += (s, e) => this.Hide();
+            // this.ShowInTaskbar = false;
+            // this.WindowState = FormWindowState.Minimized;
 
         }
 
@@ -275,33 +283,37 @@ namespace WinFormsServer
                 {
                     string subject = cert.Subject;
                     List<string> subjects = subject.Split(',').ToList();
-                    var mstSubject = subjects.Where(_ => _.Contains("MST")).FirstOrDefault();
-                    var mst = mstSubject.Substring(mstSubject.IndexOf("MST") + 4).Trim();
+                    //var mstSubject = subjects.Where(_ => _.Contains("MST")).FirstOrDefault();
+                    //var mst = mstSubject.Substring(mstSubject.IndexOf("MST") + 4).Trim();
 
                     #region Check usb token and sign
 
                     //if (mst.Equals(taxCodeVJAA))
                     if (true) //tạm chưa cần check dùng đúng chữ ký chưa
                     {
+                        var content = new StringContent("");
                         HttpResponseMessage result = null;
                         using (var client = new HttpClient())
-                        using (var content = new MultipartFormDataContent())
+                        // using (var content = new StringContent(""))
+
                         {
                             ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
                             client.BaseAddress = new Uri(_uri);
                             client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", resource.token);
-                            result = await client.GetAsync($"api/Document/view-document-for-usb");
+                            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                            result = await client.GetAsync($"api/Document/view-document-for-usb?documentId={resource.documentId}");
                             var responseBody = new ResponseModel();
                             
                             if (result.IsSuccessStatusCode)
                             {
-                                responseBody = JsonConvert.DeserializeObject<ResponseModel>(await result.Content.ReadAsStringAsync());
+                                var test = await result.Content.ReadAsStringAsync();
+                                responseBody = JsonConvert.DeserializeObject<ResponseModel>(test);
                                 if (responseBody.StatusCode == 200)
                                 {
                                     try
                                     {
                                         filePath = ConvertBase64ToPDF(responseBody.Content.File, folder);
-                                        imagePath = ConvertBase64ToPDF(responseBody.Content.Image, folder);
+                                        imagePath = ConvertBase64ToPng(responseBody.Content.Image, folder);
                                         result = null;
                                         var uploadFile = new UploadFileResource();
                                         //var responseFile = new FileDownloadResponse();
@@ -309,8 +321,22 @@ namespace WinFormsServer
                                         {
                                             case var value when value == pdf:
                                                 uploadFile = Utils.Utils.SignWithThisCert(cert, filePath, resource, resource.page,imagePath);
-                                                content.Add(new StreamContent(uploadFile.File), "File", uploadFile.fileName);
+                                                // content.Add(uploadFile.File, "File", uploadFile.fileName);
+                                                var optionsJson = JsonConvert.SerializeObject(
+                                                    uploadFile.File,
+                                                    new JsonSerializerSettings()
+                                                    );
+                                                var root = new JObject
+                                                {
+                                                    ["file"] = uploadFile.File,
+                                                    ["image"] = ""
+                                                };
+                                                string jsonBody = root.ToString(Formatting.Indented);
+
+            
+                                                content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
                                                 break;
+                                            
                                             case var value when value == xml:
                                                 //content.Add(Utils.Utils.SignXmlWithCert(cert, filePath), "File");
                                                 break;
@@ -324,7 +350,8 @@ namespace WinFormsServer
                                                 break;
                                         }
                                         result = await client.PostAsync($"api/Document/update-document-from-usb/{resource.documentId}", content);
-                                        responseBody = JsonConvert.DeserializeObject<ResponseModel>(await result.Content.ReadAsStringAsync());
+                                        var tst = await result.Content.ReadAsStringAsync();
+                                        // responseBody = JsonConvert.DeserializeObject<ResponseModel>(await result.Content.ReadAsStringAsync());
                                         if (result.IsSuccessStatusCode)
                                         {
                                             // responseClient.isSuccess = true;
@@ -339,7 +366,7 @@ namespace WinFormsServer
                                             responseClient.StatusCode = 500;
                                             responseClient.Message = "Tải lên hệ thống thất bại!";
                                             ResponseAction(JsonConvert.SerializeObject(responseClient));
-                                            writeToLog("Tải lên hệ thống thất bại: " + responseBody.Message);
+                                            writeToLog("Tải lên hệ thống thất bại: " + tst);
                                         }
 
                                         #region Delete file after sent success
@@ -380,9 +407,9 @@ namespace WinFormsServer
                     }
                     else
                     {
-                        responseClient.Message = $"Bạn đang dùng sai chữ ký! MST: {mst}!";
+                        //responseClient.Message = $"Bạn đang dùng sai chữ ký! MST: {mst}!";
                         ResponseAction(JsonConvert.SerializeObject(responseClient));
-                        writeToLog($"Bạn đang dùng sai chữ ký! MST: {mst}");
+                        //writeToLog($"Bạn đang dùng sai chữ ký! MST: {mst}");
                         //MessageBox.Show($"Bạn đang dùng sai chữ ký! MST: {mst}");
                     }
 

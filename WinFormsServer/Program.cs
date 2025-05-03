@@ -45,6 +45,11 @@ namespace WinFormsServer
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            //FrmServer form = new FrmServer();
+            //form.Load += (s, e) => form.Hide();
+
+            // Có thể dùng ApplicationContext để quản lý app
+            //Application.Run(new ApplicationContext());
             Application.Run(new FrmServer());
         }
     }

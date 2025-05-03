@@ -59,6 +59,6 @@ namespace SgTest3.Model
     public class UploadFileResource
     {
         public string fileName { get; set; }
-        public FileStream File { get; set; }
+        public byte[] File { get; set; }
     }
 }
